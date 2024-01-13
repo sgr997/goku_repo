@@ -1,3 +1,6 @@
+/**
+ * 10,20,30,40,50,0 * * * * jd_move.js
+ */
 const $ = new Env("移动变量");
 //Node.js用户请在jdCookie.js处填写京东ck;
 const {
@@ -8,20 +11,22 @@ let my_pin = []
 if (process.env.MY_PIN) {
     my_pin = process.env.MY_PIN.split(',');
 }
-
-!(async() => {
+console.log(`要移动的pin:${my_pin}`)
+!(async () => {
     const envs = await getEnvs();
-    for (let i = 0; i < envs; i++) {
-        const env = envs[i];
-        const pin = getPin(env.value)
-        if (my_pin.indexOf(pin) > -1) {
-            await moveEnv(env._id, i, my_pin.indexOf(pin))
+    console.log(`获取到:${envs.length}个变量`)
+    for (let i = 0; i < my_pin.length; i++) {
+        for (let j = 0; j < envs.length; j++) {
+            if (getPin(envs[j].value) === my_pin[i] && i === j) {
+                console.log(`移动pin:${my_pin[i]}`)
+                await moveEnv(envs[j]._id, j, i)
+                break
+            }
         }
     }
 })()
     .catch((e) => $.logErr(e))
     .finally(() => $.done())
-
 
 
 function getPin(val) {
