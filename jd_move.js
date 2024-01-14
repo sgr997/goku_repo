@@ -17,7 +17,7 @@ console.log(`要移动的pin:${my_pin}`)
     console.log(`获取到:${envs.length}个变量`)
     for (let i = 0; i < my_pin.length; i++) {
         for (let j = 0; j < envs.length; j++) {
-            if (getPin(envs[j].value) === my_pin[i] && i === j) {
+            if (getPin(envs[j].value) === my_pin[i] && i !== j) {
                 console.log(`移动pin:${my_pin[i]}`)
                 await moveEnv(envs[j]._id, j, i)
                 break
