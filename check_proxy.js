@@ -36,11 +36,7 @@ var url = process.env.RABBIT_URL
         msg += `${sercerHost} ${flag ? "✅" : "❌"}\n`;
     }
 
-    $.log("", `开始通知`);
     await notify.sendNotify(`代理检测`, `${msg}`);
-    $.log("", `通知完毕`);
-
-
 
 })()
     .catch((e) => {
