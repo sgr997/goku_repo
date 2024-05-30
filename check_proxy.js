@@ -36,7 +36,7 @@ var url = process.env.RABBIT_URL
 
     if (currentFlag) {
         // 当前使用的反代可用，发送通知并退出
-        await notify.sendNotify(`代理检测`, `${msg}`);
+        await notify.sendNotify(`代理检测`, `舒服，当前反代没问题\n${msg}`);
     } else {
         // 当前使用的反代不可用，继续检测其他反代
         sercerHosts = sercerHosts.split(",")
@@ -61,7 +61,7 @@ var url = process.env.RABBIT_URL
                 conf.ServerHost = sercerHost.replace("http://", "");
                 await saveConfig(conf);
                 $.log('已更新反代为', conf.ServerHost);
-                msg += `旧反代${oldHost}不可用，已替换为新反代${conf.ServerHost}\n`;
+                msg += `旧反代${oldHost}芭比Q了，替换为新反代${conf.ServerHost}\n`;
                 break;
             }
         }
