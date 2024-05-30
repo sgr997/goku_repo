@@ -10,7 +10,7 @@ var url = process.env.RABBIT_URL
 !(async () => {
     const username = process.env.USERNAME
     const password = process.env.PASSWORD
-    let sercerHosts = process.env.sercerHosts;
+    let sercerHosts = process.env.SERVER_HOSTS;
 
     if (url[url.length - 1] === '/') {
         url = url.substring(0, url.length - 1)
@@ -25,39 +25,48 @@ var url = process.env.RABBIT_URL
     const ServerHost = conf.ServerHost
     $.log('当前使用的反代', ServerHost)
 
-    sercerHosts = sercerHosts.split(",")
-    sercerHosts.push(ServerHost)
     let msg = ""
-    let currentHostValid = false;
+    let sercerHost = `http://${ServerHost}`;
 
-    for (let index = 0; index < sercerHosts.length; index++) {
-        let sercerHost = sercerHosts[index];
-        if (!sercerHost.startsWith("http")) {
-            sercerHost = `http://${sercerHost}`
-        }
-        $.log("", `开始测试${sercerHost}`);
-        const flag = await testServerHost(sercerHost);
-        $.log("", `${sercerHost} ${flag ? "✅" : "❌"}`);
-        msg += `${sercerHost} ${flag ? "✅" : "❌"}\n`;
+    // 先测试当前使用的反代
+    $.log("", `开始测试当前使用的反代${sercerHost}`);
+    const currentFlag = await testServerHost(sercerHost);
+    $.log("", `${sercerHost} ${currentFlag ? "✅" : "❌"}`);
+    msg += `${sercerHost} ${currentFlag ? "✅" : "❌"}\n`;
 
-        if (flag && sercerHost === `http://${ServerHost}`) {
-            currentHostValid = true;
+    if (currentFlag) {
+        // 当前使用的反代可用，发送通知并退出
+        await notify.sendNotify(`代理检测`, `${msg}`);
+    } else {
+        // 当前使用的反代不可用，继续检测其他反代
+        sercerHosts = sercerHosts.split(",")
+        sercerHosts.push(ServerHost)
+
+        for (let index = 0; index < sercerHosts.length; index++) {
+            sercerHost = sercerHosts[index];
+            if (!sercerHost.startsWith("http")) {
+                sercerHost = `http://${sercerHost}`
+            }
+            if (sercerHost === `http://${ServerHost}`) {
+                continue; // 已经测试过当前的反代，跳过
+            }
+            $.log("", `开始测试${sercerHost}`);
+            const flag = await testServerHost(sercerHost);
+            $.log("", `${sercerHost} ${flag ? "✅" : "❌"}`);
+            msg += `${sercerHost} ${flag ? "✅" : "❌"}\n`;
+
+            if (flag) {
+                // 找到一个新的可用反代，更新配置
+                const oldHost = ServerHost;
+                conf.ServerHost = sercerHost.replace("http://", "");
+                await saveConfig(conf);
+                $.log('已更新反代为', conf.ServerHost);
+                msg += `旧反代${oldHost}不可用，已替换为新反代${conf.ServerHost}\n`;
+                break;
+            }
         }
+        await notify.sendNotify(`代理检测`, `${msg}`);
     }
-
-    if (!currentHostValid) {
-        // Find a valid new host
-        const validHost = sercerHosts.find(host => host !== `http://${ServerHost}` && host !== ServerHost);
-        if (validHost) {
-            const oldHost = ServerHost;
-            conf.ServerHost = validHost.replace("http://", "");
-            await saveConfig(conf);
-            $.log('已更新反代为', conf.ServerHost);
-            msg += `旧反代${oldHost}不可用，已替换为新反代${conf.ServerHost}\n`;
-        }
-    }
-
-    await notify.sendNotify(`代理检测`, `${msg}`);
 
 })()
     .catch((e) => {
@@ -66,6 +75,7 @@ var url = process.env.RABBIT_URL
     .finally(() => {
         $.done();
     });
+
 
 async function login(username, password) {
     const body = { username, password };
