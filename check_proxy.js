@@ -8,11 +8,9 @@ var access_token = "";
 var url = process.env.RABBIT_URL
 
 !(async () => {
-
     const username = process.env.USERNAME
     const password = process.env.PASSWORD
     let sercerHosts = process.env.sercerHosts;
-
 
     if (url[url.length - 1] === '/') {
         url = url.substring(0, url.length - 1)
@@ -20,11 +18,18 @@ var url = process.env.RABBIT_URL
 
     $.log("", `${username}开始登录`);
     // access_token = await login(username, password)
-    access_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJleHAiOjE3MTgzNzI5ODd9.IeiDW-5LueUrTSKrFjhABaKOACy0NQkrXKfb_wL2J4s'
+    access_token = process.env.TOKEN
     $.log("", `${username}登录成功`);
+    
+    const conf = await getConfig()
+    const ServerHost = conf.ServerHost
+    $.log('当前使用的反代', ServerHost)
 
     sercerHosts = sercerHosts.split(",")
+    sercerHosts.push(ServerHost)
     let msg = ""
+    let currentHostValid = false;
+
     for (let index = 0; index < sercerHosts.length; index++) {
         let sercerHost = sercerHosts[index];
         if (!sercerHost.startsWith("http")) {
@@ -34,6 +39,22 @@ var url = process.env.RABBIT_URL
         const flag = await testServerHost(sercerHost);
         $.log("", `${sercerHost} ${flag ? "✅" : "❌"}`);
         msg += `${sercerHost} ${flag ? "✅" : "❌"}\n`;
+
+        if (flag && sercerHost === `http://${ServerHost}`) {
+            currentHostValid = true;
+        }
+    }
+
+    if (!currentHostValid) {
+        // Find a valid new host
+        const validHost = sercerHosts.find(host => host !== `http://${ServerHost}` && host !== ServerHost);
+        if (validHost) {
+            const oldHost = ServerHost;
+            conf.ServerHost = validHost.replace("http://", "");
+            await saveConfig(conf);
+            $.log('已更新反代为', conf.ServerHost);
+            msg += `旧反代${oldHost}不可用，已替换为新反代${conf.ServerHost}\n`;
+        }
     }
 
     await notify.sendNotify(`代理检测`, `${msg}`);
@@ -44,89 +65,60 @@ var url = process.env.RABBIT_URL
     })
     .finally(() => {
         $.done();
-    })
-
-
+    });
 
 async function login(username, password) {
-    const body = {
-        username: username,
-        password: password
-    }
-    let option = {
+    const body = { username, password };
+    const option = {
         url: `${url}/admin/auth`,
         headers: {
             "accept": "application/json, text/plain, */*",
-            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "cache-control": "no-cache",
             "content-type": "application/json;charset=UTF-8",
-            "pragma": "no-cache"
         },
         body: JSON.stringify(body)
-    }
-    let result = await $.http.post(option).then(response => {
-        return response.body
-    })
-    return JSON.parse(result)['access_token']
+    };
+    const result = await $.http.post(option).then(response => response.body);
+    return JSON.parse(result).access_token;
 }
 
-
 async function testServerHost(proxyHost) {
-    const body = {
-        ServerHost: proxyHost,
-    }
-    let option = {
+    const option = {
         url: `${url}/admin/TestServerHost`,
         headers: {
             "accept": "application/json, text/plain, */*",
-            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "cache-control": "no-cache",
             "content-type": "application/json;charset=UTF-8",
             "Authorization": `Bearer ${access_token}`,
-            "pragma": "no-cache"
         },
-        body: JSON.stringify(body)
-    }
-    let result = await $.http.post(option).then(response => {
-        return response.body
-    })
-    return JSON.parse(result)["success"]
+        body: JSON.stringify({ ServerHost: proxyHost })
+    };
+    const result = await $.http.post(option).then(response => response.body);
+    return JSON.parse(result).success;
 }
 
 async function getConfig() {
-    let option = {
+    const option = {
         url: `${url}/admin/GetConfig`,
         headers: {
             "accept": "application/json, text/plain, */*",
-            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "cache-control": "no-cache",
             "Authorization": `Bearer ${access_token}`,
-            "pragma": "no-cache"
         },
-    }
-    let result = await $.http.get(option).then(response => {
-        return response.body
-    })
-    return JSON.parse(result)
+    };
+    const result = await $.http.get(option).then(response => response.body);
+    return JSON.parse(result);
 }
 
 async function saveConfig(config) {
-    let option = {
+    const option = {
         url: `${url}/admin/SaveConfig`,
         headers: {
             "accept": "application/json, text/plain, */*",
-            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "cache-control": "no-cache",
             "content-type": "application/json;charset=UTF-8",
             "Authorization": `Bearer ${access_token}`,
-            "pragma": "no-cache"
         },
         body: JSON.stringify(config)
-    }
-    let result = await $.http.post(option).then(response => {
-        return response.body
-    })
-    return JSON.parse(result)
+    };
+    const result = await $.http.post(option).then(response => response.body);
+    return JSON.parse(result);
 }
 
 
